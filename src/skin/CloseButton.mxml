@@ -50,9 +50,12 @@
     <!--- @private -->
     <s:Rect id="fill" left="0" right="0" top="0" bottom="0" radiusX="5">
         <s:fill>
-			<s:SolidColor alpha="0.7" color="0x000000"
-						  alpha.over="1" color.over="0x666666" />
+			<s:SolidColor alpha="0.7" color="0x000000" alpha.over="0.9" />
         </s:fill>
+		<s:stroke>
+			<s:SolidColorStroke color="0xFFFFFF" weight="1"
+								alpha="0" alpha.over="0.5" alpha.down="1" />
+		</s:stroke>
     </s:Rect>
 
     <!-- text -->

@@ -3,7 +3,8 @@
 		 xmlns:s="library://ns.adobe.com/flex/spark"
 		 xmlns:mx="library://ns.adobe.com/flex/mx"
 		 width="650" height="350"
-		 initialize="setup(event)">
+		 initialize="setup(event)"
+		 mouseWheel="mouseWheel(event)">
 
 	<fx:Script>
 		<![CDATA[
@@ -12,11 +13,14 @@
 			
 			import comic.Page;
 			
+			import mx.collections.ArrayCollection;
 			import mx.collections.ArrayList;
 			import mx.controls.Alert;
 			import mx.events.FlexEvent;
 			import mx.graphics.codec.JPEGEncoder;
 			
+			import spark.collections.Sort;
+			import spark.collections.SortField;
 			import spark.components.Window;
 			import spark.events.IndexChangeEvent;
 			
@@ -26,10 +30,57 @@
 			
 			//================================================
 			public function get imgWidth():int {
-				return loader.contentLoaderInfo.width;
+				try{
+					return loader.contentLoaderInfo.width;
+				} catch(error:Error) {
+				}
+				return 1;
 			}
 			public function get imgHeight():int {
-				return loader.contentLoaderInfo.height;
+				try{
+					return loader.contentLoaderInfo.height;
+				} catch(error:Error) {
+				}
+				return 1;
+			}
+			//================================================
+			protected const APP_NAME:String = "ComicReader";
+			protected function saveFilePath(path:String):void {
+				var so:SharedObject = SharedObject.getLocal(APP_NAME);
+				so.data.filepath = path;
+				so.flush();
+				so.close();
+
+				savePage(0);
+			}
+			protected function savePage(index:int):void {
+				var so:SharedObject = SharedObject.getLocal(APP_NAME);
+				so.data.page = index;
+				so.flush();
+				so.close();
+			}
+			protected function getSavedPathFile():File {
+				var so:SharedObject = SharedObject.getLocal(APP_NAME);
+				try {
+					var filepath:String = so.data.filepath;
+					var file:File = new File(filepath);
+					if(file.exists) return file;
+				} catch(error:Error) {
+				} finally {
+					so.close();
+				}
+				return null;
+			}
+			protected function getSavedPage():int {
+				var so:SharedObject = SharedObject.getLocal(APP_NAME);
+				try {
+					var page:int = so.data.page;
+					return page != -1 ? page : 0;
+				} catch(error:Error) {
+				} finally {
+					so.close();
+				}
+				return 0;
 			}
 			//================================================
 			
@@ -40,6 +91,13 @@
 					b.draw(loader);
 					loadImage(b);
 				});
+
+				// Load File if exists
+				file = getSavedPathFile();
+				if(file != null)
+					fileSelectpd();
+				else
+					file = new File();
 			}
 			
 			// Load File
@@ -49,29 +107,36 @@
 				file.addEventListener(Event.SELECT, fileSelectpd);
 			}
 			
-			protected function fileSelectpd(e:Event):void {
+			protected function fileSelectpd(e:Event = null):void {
+				if(e != null) saveFilePath(file.nativePath);
+
 				reader = new ZipFileReader();
 				reader.open(file);
 				var entry:ZipEntry;
-				var list:ArrayList = filterEntries(reader.getEntries());
+				var list:ArrayCollection = filterEntries(reader.getEntries());
 				lst_images.dataProvider = list;
+				lst_images.selectedIndex = getSavedPage();
 				
-				var page:Page = Page(list.getItemAt(0));
+				var page:Page = Page(list.getItemAt(getSavedPage()));
 				loadPage(page);
 			}
 			
-			public function filterEntries(list:Array):ArrayList {
-				var ret:ArrayList = new ArrayList();
+			public function filterEntries(list:Array):ArrayCollection {
+				var ret:ArrayCollection = new ArrayCollection();
 				for each(var entry:ZipEntry in list) {
 					if(entry.getFilename().indexOf("__") != 0 && !entry.isDirectory()) {
 						ret.addItem(new Page(entry));
 					}
 				}
+				var sort:Sort = new Sort();
+				sort.fields=[new SortField("filename")];
+				ret.sort = sort;
+				ret.refresh();
 				return ret;
 			}
 			
 			// Update Image
-			protected function lst_images_changeHandler(event:IndexChangeEvent):void {
+			protected function pageChanged(event:IndexChangeEvent = null):void {
 				var page:Page = lst_images.selectedItem;
 				loadPage(page);
 			}
@@ -79,18 +144,38 @@
 			protected function loadPage(page:Page):void {
 				var data:ByteArray = reader.unzip(page.entry);
 				loader.loadBytes(data);
+				lbl_title.text = page.filename;
 			}
 			
 			protected function loadImage(data:BitmapData):void {
 				updateScale();
 				img_loader.source = data;
+				var x:int = (this.width - imgWidth * sld_scale.value / 100) / 2;
+				img_loader.x = x < 0 ? 0 : x;
+				img_loader.y = 24;
 			}
-			
-			protected function updateScale(event:Event = null):void {
-				var size:Number = sld_scale.value;
-				
-				img_loader.width = imgWidth * size / 100;
-				img_loader.height = imgHeight * size / 100;
+
+			// User Select Page
+			public function prevPage(e:Event):void {
+				var ind:int = lst_images.selectedIndex - 1;
+				updatePageByIndex(ind);
+			}
+			public function nextPage(e:Event):void {
+				var ind:int = lst_images.selectedIndex + 1;
+				updatePageByIndex(ind);
+			}
+			public function refreshPage(e:Event):void {
+				var ind:int = lst_images.selectedIndex;
+				updatePageByIndex(ind);
+			}
+			protected function updatePageByIndex(ind:int):void {
+				if(lst_images.dataProvider == null) return;
+
+				var length:int = lst_images.dataProvider.length;
+				ind = (ind + length) % length;
+				lst_images.selectedIndex = ind;
+				savePage(lst_images.selectedIndex);
+				pageChanged();
 			}
 			
 			// User move image position
@@ -111,16 +196,29 @@
 				preMosPos = null;
 			}
 
-			[Bindable]
-			protected var showControl:Boolean = false;
-			protected function grp_control_mouseOverHandler(event:MouseEvent):void {
-				showControl = true;
+			// User update scale
+			protected function mouseWheel(event:MouseEvent):void {
+				if(event.delta > 0)
+					sld_scale.value += sld_scale.stepSize;
+				else
+					sld_scale.value -= sld_scale.stepSize;
+				updateScale();
 			}
 
-			protected function grp_control_mouseOutHandler(event:MouseEvent):void {
-				showControl = false;
+			protected function updateScale(event:Event = null):void {
+				var size:Number = sld_scale.value;
+
+				img_loader.width = imgWidth * size / 100;
+				img_loader.height = imgHeight * size / 100;
+				lbl_scale.text = "Scale: " + size + "%";
 			}
-			
+
+			// Controller
+			[Bindable]
+			protected var showControl:Boolean = false;
+			protected function optionWindow(event:MouseEvent):void {
+				showControl = !showControl;
+			}
 		]]>
 	</fx:Script>
 
@@ -131,26 +229,27 @@
 		<s:Image id="img_loader" y="24" scaleMode="stretch" smooth="true" smoothingQuality="high"/>
 	</s:Group>
 	<!-- Controller Container -->
-	<s:Group id="grp_control_trigger" right="0" width="10" height="100%" visible="{!showControl}"
-			 mouseOver="grp_control_mouseOverHandler(event)">
-		<s:Rect width="100%" height="100%">
-			<s:fill><s:SolidColor color="0xCCCCCC" /></s:fill>
-		</s:Rect>
-	</s:Group>
-	<s:Group id="grp_control" right="10" top="30" bottom="10" width="200" visible="{showControl}"
-			 mouseOut="grp_control_mouseOutHandler(event)">
-		<s:Rect width="100%" height="100%">
-			<s:fill><s:SolidColor color="0xCCCCCC" alpha="0.1" /></s:fill>
-		</s:Rect>
+	<s:Group id="grp_control" right="10" top="30" bottom="10" width="200" visible="{showControl}">
 		<s:List id="lst_images" top="19" bottom="0" width="100%"
-				change="lst_images_changeHandler(event)" labelField="filename"></s:List>
+				change="pageChanged(event)" labelField="filename"></s:List>
 		<s:HSlider id="sld_scale" width="100%" change="updateScale(event)" maximum="300"
 				   minimum="10" stepSize="10" value="100"/>
 	</s:Group>
+	<s:HGroup id="grp_pageNav" bottom="10" height="30" fontSize="24" gap="10" horizontalCenter="0">
+		<s:Button height="100%" label="&lt;&lt;" click="prevPage(event)" color="#FFFFFF"
+				  skinClass="skin.CloseButton"/>
+		<s:Button height="100%" label="+" click="refreshPage(event)" color="#FFFFFF"
+				  skinClass="skin.CloseButton"/>
+		<s:Button height="100%" label="&gt;&gt;" click="nextPage(event)" color="#FFFFFF"
+				  skinClass="skin.CloseButton"/>
+	</s:HGroup>
 
 	<s:Label id="lbl_title" width="100%" height="24" backgroundAlpha="0.5" backgroundColor="#000000"
 			 color="#FFFFFF" paddingLeft="5" paddingRight="5" paddingTop="2" text="Comic Reader"
 			 verticalAlign="middle"/>
-	<s:Button right="2" top="2" height="20" label="Open Comic File" click="openFile(event)" color="#FFFFFF"
-			  skinClass="skin.CloseButton"/>
+	<s:Label id="lbl_scale" right="188" top="8" color="#FFFFFF" />
+	<s:Button right="2" top="2" height="20" label="Option" click="optionWindow(event)"
+			  color="#FFFFFF" skinClass="skin.CloseButton"/>
+	<s:Button right="67" top="2" height="20" label="Open Comic File" click="openFile(event)"
+			  color="#FFFFFF" skinClass="skin.CloseButton"/>
 </s:Group>
