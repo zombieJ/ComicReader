@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<s:SparkButtonSkin xmlns:fx="http://ns.adobe.com/mxml/2009" 
+             xmlns:s="library://ns.adobe.com/flex/spark" 
+             xmlns:fb="http://ns.adobe.com/flashbuilder/2009"
+             minWidth="21" minHeight="21" 
+             alpha.disabled="0.5">
+     
+    <fx:Metadata>
+        <![CDATA[ 
+        [HostComponent("spark.components.Button")]
+        ]]>
+    </fx:Metadata>
+    
+    <fx:Script fb:purpose="styling">
+        <![CDATA[         
+            import spark.components.Group;
+            static private const exclusions:Array = ["labelDisplay"];
+
+			override public function get colorizeExclusions():Array {return exclusions;}
+
+			override protected function initializationComplete():void {
+                useChromeColor = true;
+                super.initializationComplete();
+            }  
+
+			override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void {
+                var cr:Number = getStyle("cornerRadius");
+
+                if (cornerRadius != cr) {
+                    cornerRadius = cr;
+                    fill.radiusX = cornerRadius;
+                }
+
+                super.updateDisplayList(unscaledWidth, unscaledHeight);
+            }
+            private var cornerRadius:Number = 2;
+        ]]>        
+    </fx:Script>
+        
+    <!-- states -->
+    <s:states>
+        <s:State name="up" />
+        <s:State name="over" />
+        <s:State name="down" />
+        <s:State name="disabled" />
+    </s:states>
+
+    <!-- fill -->
+    <!--- @private -->
+    <s:Rect id="fill" left="0" right="0" top="0" bottom="0" radiusX="5">
+        <s:fill>
+			<s:SolidColor alpha="0.7" color="0x000000"
+						  alpha.over="1" color.over="0x666666" />
+        </s:fill>
+    </s:Rect>
+
+    <!-- text -->
+    <s:Label id="labelDisplay"
+             textAlign="center"
+             maxDisplayedLines="1"
+             horizontalCenter="0" verticalCenter="2" verticalAlign="middle"
+             left="10" right="10" top="2" bottom="2">
+    </s:Label>
+    
+</s:SparkButtonSkin>

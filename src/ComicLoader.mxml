@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009"
-					   xmlns:s="library://ns.adobe.com/flex/spark"
-					   xmlns:mx="library://ns.adobe.com/flex/mx"
-					   width="650" height="350" applicationComplete="setup(event)">
-	
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="650" height="350"
+		 initialize="setup(event)">
+
 	<fx:Script>
 		<![CDATA[
 			import com.coltware.airxzip.ZipEntry;
@@ -16,11 +17,13 @@
 			import mx.events.FlexEvent;
 			import mx.graphics.codec.JPEGEncoder;
 			
+			import spark.components.Window;
 			import spark.events.IndexChangeEvent;
-
+			
+			protected var file:File = new File();
 			protected var reader:ZipFileReader;
 			protected var loader:Loader = new Loader();
-
+			
 			//================================================
 			public function get imgWidth():int {
 				return loader.contentLoaderInfo.width;
@@ -29,7 +32,7 @@
 				return loader.contentLoaderInfo.height;
 			}
 			//================================================
-
+			
 			protected function setup(event:FlexEvent):void {
 				// Get image size
 				loader.contentLoaderInfo.addEventListener(Event.INIT, function(e:Event):void {
@@ -37,10 +40,17 @@
 					b.draw(loader);
 					loadImage(b);
 				});
-
-				// Init
+			}
+			
+			// Load File
+			protected function openFile(event:MouseEvent = null):void {
+				var cbzFilter:FileFilter = new FileFilter("Comic File", "*.cbz");
+				file.browseForOpen("Open Comic", [cbzFilter]);
+				file.addEventListener(Event.SELECT, fileSelectpd);
+			}
+			
+			protected function fileSelectpd(e:Event):void {
 				reader = new ZipFileReader();
-				var file:File = new File("E:\\TDDOWNLOAD\\Don Rosa\\01-The Son of the Sun.cbz");
 				reader.open(file);
 				var entry:ZipEntry;
 				var list:ArrayList = filterEntries(reader.getEntries());
@@ -49,7 +59,7 @@
 				var page:Page = Page(list.getItemAt(0));
 				loadPage(page);
 			}
-
+			
 			public function filterEntries(list:Array):ArrayList {
 				var ret:ArrayList = new ArrayList();
 				for each(var entry:ZipEntry in list) {
@@ -60,16 +70,17 @@
 				return ret;
 			}
 			
+			// Update Image
 			protected function lst_images_changeHandler(event:IndexChangeEvent):void {
 				var page:Page = lst_images.selectedItem;
 				loadPage(page);
 			}
-
+			
 			protected function loadPage(page:Page):void {
 				var data:ByteArray = reader.unzip(page.entry);
 				loader.loadBytes(data);
 			}
-
+			
 			protected function loadImage(data:BitmapData):void {
 				updateScale();
 				img_loader.source = data;
@@ -77,12 +88,11 @@
 			
 			protected function updateScale(event:Event = null):void {
 				var size:Number = sld_scale.value;
-
+				
 				img_loader.width = imgWidth * size / 100;
 				img_loader.height = imgHeight * size / 100;
-				this.title = img_loader.width + "/" + img_loader.height;
 			}
-
+			
 			// User move image position
 			private var prePos:Point;
 			private var preMosPos:Point;
@@ -90,33 +100,57 @@
 				prePos = new Point(img_loader.x, img_loader.y);
 				preMosPos = new Point(e.stageX, e.stageY);
 			}
-
+			
 			protected function grp_img_mouseMove(e:MouseEvent):void {
 				if(preMosPos == null) return;
 				img_loader.x = prePos.x + e.stageX - preMosPos.x;
 				img_loader.y = prePos.y + e.stageY - preMosPos.y;
 			}
-
+			
 			protected function grp_img_mouseUp(e:MouseEvent):void {
 				preMosPos = null;
 			}
+
+			[Bindable]
+			protected var showControl:Boolean = false;
+			protected function grp_control_mouseOverHandler(event:MouseEvent):void {
+				showControl = true;
+			}
+
+			protected function grp_control_mouseOutHandler(event:MouseEvent):void {
+				showControl = false;
+			}
+			
 		]]>
 	</fx:Script>
-	
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	<s:Group id="grp_img" left="0" right="218" top="0" bottom="0"
-			 mouseDown="grp_img_mouseDown(event)"
-			 mouseMove="grp_img_mouseMove(event)"
-			 mouseUp="grp_img_mouseUp(event)"
-			 clipAndEnableScrolling="true">
-		<s:Image id="img_loader" scaleMode="stretch" smooth="true" smoothingQuality="high"/>
+
+	<!-- Image Container -->
+	<s:Group id="grp_img" y="0" width="100%" height="100%" clipAndEnableScrolling="true"
+			 mouseDown="grp_img_mouseDown(event)" mouseMove="grp_img_mouseMove(event)"
+			 mouseUp="grp_img_mouseUp(event)">
+		<s:Image id="img_loader" y="24" scaleMode="stretch" smooth="true" smoothingQuality="high"/>
 	</s:Group>
-	<s:Group right="10" top="10" bottom="10" width="200">
+	<!-- Controller Container -->
+	<s:Group id="grp_control_trigger" right="0" width="10" height="100%" visible="{!showControl}"
+			 mouseOver="grp_control_mouseOverHandler(event)">
+		<s:Rect width="100%" height="100%">
+			<s:fill><s:SolidColor color="0xCCCCCC" /></s:fill>
+		</s:Rect>
+	</s:Group>
+	<s:Group id="grp_control" right="10" top="30" bottom="10" width="200" visible="{showControl}"
+			 mouseOut="grp_control_mouseOutHandler(event)">
+		<s:Rect width="100%" height="100%">
+			<s:fill><s:SolidColor color="0xCCCCCC" alpha="0.1" /></s:fill>
+		</s:Rect>
 		<s:List id="lst_images" top="19" bottom="0" width="100%"
 				change="lst_images_changeHandler(event)" labelField="filename"></s:List>
 		<s:HSlider id="sld_scale" width="100%" change="updateScale(event)" maximum="300"
 				   minimum="10" stepSize="10" value="100"/>
 	</s:Group>
-</s:WindowedApplication>
+
+	<s:Label id="lbl_title" width="100%" height="24" backgroundAlpha="0.5" backgroundColor="#000000"
+			 color="#FFFFFF" paddingLeft="5" paddingRight="5" paddingTop="2" text="Comic Reader"
+			 verticalAlign="middle"/>
+	<s:Button right="2" top="2" height="20" label="Open Comic File" click="openFile(event)" color="#FFFFFF"
+			  skinClass="skin.CloseButton"/>
+</s:Group>
