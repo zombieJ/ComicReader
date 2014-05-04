@@ -4,7 +4,8 @@
 		 xmlns:mx="library://ns.adobe.com/flex/mx"
 		 width="650" height="350"
 		 initialize="setup(event)"
-		 mouseWheel="mouseWheel(event)">
+		 mouseWheel="mouseWheel(event)"
+		 resize="updateView(event)">
 
 	<fx:Script>
 		<![CDATA[
@@ -28,6 +29,7 @@
 			protected var reader:ZipFileReader;
 			protected var loader:Loader = new Loader();
 			protected var currentImage:BitmapData;
+			protected var startPoint:Point;
 			
 			//================================================
 			public function get imgWidth():int {
@@ -149,12 +151,9 @@
 			}
 			
 			protected function loadImage(data:BitmapData):void {
-				updateScale();
 				currentImage = data;
-				img_loader.source = currentImage;
-				//var x:int = (this.width - imgWidth * sld_scale.value / 100) / 2;
-				//img_loader.x = x < 0 ? 0 : x;
-				//img_loader.y = 24;
+				startPoint = new Point();
+				updateView();
 			}
 
 			// User Select Page
@@ -184,15 +183,15 @@
 			private var prePos:Point;
 			private var preMosPos:Point;
 			protected function grp_img_mouseDown(e:MouseEvent):void {
-				return;
-				prePos = new Point(img_loader.x, img_loader.y);
+				prePos = new Point(startPoint.x, startPoint.y);
 				preMosPos = new Point(e.stageX, e.stageY);
 			}
 			
 			protected function grp_img_mouseMove(e:MouseEvent):void {
 				if(preMosPos == null) return;
-				img_loader.x = prePos.x + e.stageX - preMosPos.x;
-				img_loader.y = prePos.y + e.stageY - preMosPos.y;
+				startPoint.x = prePos.x + e.stageX - preMosPos.x;
+				startPoint.y = prePos.y + e.stageY - preMosPos.y;
+				updateView();
 			}
 			
 			protected function grp_img_mouseUp(e:MouseEvent):void {
@@ -200,24 +199,29 @@
 			}
 
 			// User update scale
+			public function get imgScale():Number {
+				return sld_scale.value / 100;
+			}
+
 			protected function mouseWheel(event:MouseEvent):void {
 				var value:Number = sld_scale.value;
 				if(event.delta > 0)
 					sld_scale.value = Math.min(sld_scale.maximum, value + sld_scale.stepSize);
 				else
 					sld_scale.value = Math.max(sld_scale.minimum, value - sld_scale.stepSize);
-				updateScale();
+				updateView();
 			}
 
-			protected function updateScale(event:Event = null):void {
+			protected function updateView(event:Event = null):void {
 				var size:Number = sld_scale.value;
 
-				var w:int = imgWidth * size / 100;
-				var h:int = imgHeight * size / 100;
-				//lbl_scale.text = "Scale: " + w + "x" + h + "-" + size + "%"; 5153
 				lbl_scale.text = "Scale: " + size + "%";
-				//img_loader.width = w;
-				//img_loader.height = h;
+				var bm:BitmapData = new BitmapData(this.width, this.height, true, 0x000000);
+				var matrix:Matrix = new Matrix();
+				matrix.scale(imgScale, imgScale);
+				matrix.translate(startPoint.x, startPoint.y);
+				bm.draw(currentImage, matrix);
+				img_loader.source = bm;
 			}
 
 			// Controller
@@ -233,14 +237,14 @@
 	<s:Group id="grp_img" y="0" width="100%" height="100%" clipAndEnableScrolling="true"
 			 mouseDown="grp_img_mouseDown(event)" mouseMove="grp_img_mouseMove(event)"
 			 mouseUp="grp_img_mouseUp(event)">
-		<s:Image id="img_loader" left="50" right="0" top="0" bottom="0"
-				 smooth="true" smoothingQuality="high"/>
+		<s:Image id="img_loader" width="100%" height="100%" fillMode="clip" smooth="true"
+				 smoothingQuality="high"/>
 	</s:Group>
 	<!-- Controller Container -->
 	<s:Group id="grp_control" right="10" top="30" bottom="10" width="200" visible="{showControl}">
 		<s:List id="lst_images" top="19" bottom="0" width="100%"
 				change="pageChanged(event)" labelField="filename"></s:List>
-		<s:HSlider id="sld_scale" width="100%" change="updateScale(event)"
+		<s:HSlider id="sld_scale" width="100%" change="updateView(event)"
 				   maximum="300"  minimum="10" stepSize="10" value="100"/>
 	</s:Group>
 	<s:HGroup id="grp_pageNav" bottom="10" height="30" fontSize="24" gap="10" horizontalCenter="0">
