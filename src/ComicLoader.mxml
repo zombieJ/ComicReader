@@ -152,7 +152,8 @@
 			
 			protected function loadImage(data:BitmapData):void {
 				currentImage = data;
-				startPoint = new Point();
+				startPoint = new Point(0, 24);
+				startPoint.x = Math.max(0, (this.width - data.width * imgScale) / 2);
 				updateView();
 			}
 
