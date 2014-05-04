@@ -27,6 +27,7 @@
 			protected var file:File = new File();
 			protected var reader:ZipFileReader;
 			protected var loader:Loader = new Loader();
+			protected var currentImage:BitmapData;
 			
 			//================================================
 			public function get imgWidth():int {
@@ -149,10 +150,11 @@
 			
 			protected function loadImage(data:BitmapData):void {
 				updateScale();
-				img_loader.source = data;
-				var x:int = (this.width - imgWidth * sld_scale.value / 100) / 2;
-				img_loader.x = x < 0 ? 0 : x;
-				img_loader.y = 24;
+				currentImage = data;
+				img_loader.source = currentImage;
+				//var x:int = (this.width - imgWidth * sld_scale.value / 100) / 2;
+				//img_loader.x = x < 0 ? 0 : x;
+				//img_loader.y = 24;
 			}
 
 			// User Select Page
@@ -182,6 +184,7 @@
 			private var prePos:Point;
 			private var preMosPos:Point;
 			protected function grp_img_mouseDown(e:MouseEvent):void {
+				return;
 				prePos = new Point(img_loader.x, img_loader.y);
 				preMosPos = new Point(e.stageX, e.stageY);
 			}
@@ -198,19 +201,23 @@
 
 			// User update scale
 			protected function mouseWheel(event:MouseEvent):void {
+				var value:Number = sld_scale.value;
 				if(event.delta > 0)
-					sld_scale.value += sld_scale.stepSize;
+					sld_scale.value = Math.min(sld_scale.maximum, value + sld_scale.stepSize);
 				else
-					sld_scale.value -= sld_scale.stepSize;
+					sld_scale.value = Math.max(sld_scale.minimum, value - sld_scale.stepSize);
 				updateScale();
 			}
 
 			protected function updateScale(event:Event = null):void {
 				var size:Number = sld_scale.value;
 
-				img_loader.width = imgWidth * size / 100;
-				img_loader.height = imgHeight * size / 100;
+				var w:int = imgWidth * size / 100;
+				var h:int = imgHeight * size / 100;
+				//lbl_scale.text = "Scale: " + w + "x" + h + "-" + size + "%"; 5153
 				lbl_scale.text = "Scale: " + size + "%";
+				//img_loader.width = w;
+				//img_loader.height = h;
 			}
 
 			// Controller
@@ -226,14 +233,15 @@
 	<s:Group id="grp_img" y="0" width="100%" height="100%" clipAndEnableScrolling="true"
 			 mouseDown="grp_img_mouseDown(event)" mouseMove="grp_img_mouseMove(event)"
 			 mouseUp="grp_img_mouseUp(event)">
-		<s:Image id="img_loader" y="24" scaleMode="stretch" smooth="true" smoothingQuality="high"/>
+		<s:Image id="img_loader" left="50" right="0" top="0" bottom="0"
+				 smooth="true" smoothingQuality="high"/>
 	</s:Group>
 	<!-- Controller Container -->
 	<s:Group id="grp_control" right="10" top="30" bottom="10" width="200" visible="{showControl}">
 		<s:List id="lst_images" top="19" bottom="0" width="100%"
 				change="pageChanged(event)" labelField="filename"></s:List>
-		<s:HSlider id="sld_scale" width="100%" change="updateScale(event)" maximum="300"
-				   minimum="10" stepSize="10" value="100"/>
+		<s:HSlider id="sld_scale" width="100%" change="updateScale(event)"
+				   maximum="300"  minimum="10" stepSize="10" value="100"/>
 	</s:Group>
 	<s:HGroup id="grp_pageNav" bottom="10" height="30" fontSize="24" gap="10" horizontalCenter="0">
 		<s:Button height="100%" label="&lt;&lt;" click="prevPage(event)" color="#FFFFFF"
